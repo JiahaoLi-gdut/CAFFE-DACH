@@ -1,0 +1,650 @@
+name: "AlexNet for Office"
+
+# ---------------------------------------------------------------------- Source
+# Train phase
+layer {
+  name: "data_0"
+  type: "Data"
+  top: "data_0"
+  top: "label_0"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_imag_homo/_datasets/dslr_train_0_lmdb"
+    backend: LMDB
+    batch_size: 128
+  }
+  transform_param {
+    crop_size: 227
+    mean_file: "/home/ljh/caffe-master/data/ilsvrc12/imagenet_mean.binaryproto"
+    mirror: true
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "data_1"
+  type: "Data"
+  top: "data_1"
+  top: "label_1"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_imag_homo/_datasets/webcam_train_0_lmdb"
+    backend: LMDB
+    batch_size: 128
+  }
+  transform_param {
+    crop_size: 227
+    mean_file: "/home/ljh/caffe-master/data/ilsvrc12/imagenet_mean.binaryproto"
+    mirror: true
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "data_2"
+  type: "Data"
+  top: "data_2"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_imag_homo/_datasets/amazon_train_0_lmdb"
+    backend: LMDB
+    batch_size: 128
+  }
+  transform_param {
+    crop_size: 227
+    mean_file: "/home/ljh/caffe-master/data/ilsvrc12/imagenet_mean.binaryproto"
+    mirror: true
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "label_2"
+  type: "Param2Top"
+  top: "label_2"
+  param {
+    name: "pseudo_label"
+  }
+  param2top_param {
+    data_filler {
+      type: "constant"
+      value: -1
+    }
+    data_refill: 1
+    shape {
+      dim: 128
+    }
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "train_data"
+  type: "Concat"
+  bottom: "data_0"
+  bottom: "data_1"
+  bottom: "data_2"
+  top: "data"
+  concat_param {
+    concat_dim: 0
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "train_label"
+  type: "Concat"
+  bottom: "label_0"
+  bottom: "label_1"
+  bottom: "label_2"
+  top: "label"
+  concat_param {
+    concat_dim: 0
+  }
+  include: { phase: TRAIN }
+}
+
+# ---------------------------------------------------------------------- Target
+# Test phase
+layer {
+  name: "test_data"
+  type: "Data"
+  top: "data"
+  top: "label"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_imag_homo/_datasets/amazon_train_0_lmdb"
+    backend: LMDB
+    batch_size: 1
+  }
+  transform_param {
+    crop_size: 227
+    mean_file: "/home/ljh/caffe-master/data/ilsvrc12/imagenet_mean.binaryproto"
+    mirror: true
+  }
+  include: { phase: TEST }
+}
+
+# ----------------------------------------------------------------------------
+layer {
+  name: "conv1"
+  type: "Convolution"
+  bottom: "data"
+  top: "conv1"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 96
+    kernel_size: 11
+    stride: 4
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+
+layer {
+  name: "relu1"
+  type: "ReLU"
+  bottom: "conv1"
+  top: "conv1"
+}
+
+layer {
+  name: "norm1"
+  type: "LRN"
+  bottom: "conv1"
+  top: "norm1"
+  lrn_param {
+    local_size: 5
+    alpha: 0.0001
+    beta: 0.75
+  }
+}
+
+layer {
+  name: "pool1"
+  type: "Pooling"
+  bottom: "norm1"
+  top: "pool1"
+  pooling_param {
+    pool: MAX
+    kernel_c: 1
+    kernel_h: 3
+    kernel_w: 3
+    stride_c: 1
+    stride_h: 2
+    stride_w: 2
+  }
+}
+
+# ----------------------------------------------------------------------------
+layer {
+  name: "conv2"
+  type: "Convolution"
+  bottom: "pool1"
+  top: "conv2"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 256
+    pad: 2
+    kernel_size: 5
+    group: 2
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.1
+    }
+  }
+}
+
+layer {
+  name: "relu2"
+  type: "ReLU"
+  bottom: "conv2"
+  top: "conv2"
+}
+
+layer {
+  name: "norm2"
+  type: "LRN"
+  bottom: "conv2"
+  top: "norm2"
+  lrn_param {
+    local_size: 5
+    alpha: 0.0001
+    beta: 0.75
+  }
+}
+
+layer {
+  name: "pool2"
+  type: "Pooling"
+  bottom: "norm2"
+  top: "pool2"
+  pooling_param {
+    pool: MAX
+    kernel_c: 1
+    kernel_h: 3
+    kernel_w: 3
+    stride_c: 1
+    stride_h: 2
+    stride_w: 2
+  }
+}
+
+# ----------------------------------------------------------------------------
+layer {
+  name: "conv3"
+  type: "Convolution"
+  bottom: "pool2"
+  top: "conv3"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 384
+    pad: 1
+    kernel_size: 3
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+
+layer {
+  name: "relu3"
+  type: "ReLU"
+  bottom: "conv3"
+  top: "conv3"
+}
+
+# ----------------------------------------------------------------------------
+layer {
+  name: "conv4"
+  type: "Convolution"
+  bottom: "conv3"
+  top: "conv4"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 384
+    pad: 1
+    kernel_size: 3
+    group: 2
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.1
+    }
+  }
+}
+
+layer {
+  name: "relu4"
+  type: "ReLU"
+  bottom: "conv4"
+  top: "conv4"
+}
+
+# ----------------------------------------------------------------------------
+layer {
+  name: "conv5"
+  type: "Convolution"
+  bottom: "conv4"
+  top: "conv5"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 256
+    pad: 1
+    kernel_size: 3
+    group: 2
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.1
+    }
+  }
+}
+
+layer {
+  name: "relu5"
+  type: "ReLU"
+  bottom: "conv5"
+  top: "conv5"
+}
+
+layer {
+  name: "pool5"
+  type: "Pooling"
+  bottom: "conv5"
+  top: "pool5"
+  pooling_param {
+    pool: MAX
+    kernel_c: 1
+    kernel_h: 3
+    kernel_w: 3
+    stride_c: 1
+    stride_h: 2
+    stride_w: 2
+  }
+}
+
+# ----------------------------------------------------------------------------
+layer {
+  name: "fc6"
+  type: "InnerProduct"
+  bottom: "pool5"
+  top: "fc6"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 4096
+    weight_filler {
+      type: "gaussian"
+      std: 0.005
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.1
+    }
+  }
+}
+
+layer {
+  name: "relu6"
+  type: "ReLU"
+  bottom: "fc6"
+  top: "fc6"
+}
+
+layer {
+  name: "drop6"
+  type: "Dropout"
+  bottom: "fc6"
+  top: "fc6"
+  dropout_param {
+    dropout_ratio: 0.5
+  }
+}
+
+# ----------------------------------------------------------------------------
+layer {
+  name: "fc7"
+  type: "InnerProduct"
+  bottom: "fc6"
+  top: "fc7"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 4096
+    weight_filler {
+      type: "gaussian"
+      std: 0.005
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.1
+    }
+  }
+}
+
+layer {
+  name: "relu7"
+  type: "ReLU"
+  bottom: "fc7"
+  top: "fc7"
+}
+
+layer {
+  name: "drop7"
+  type: "Dropout"
+  bottom: "fc7"
+  top: "fc7"
+  dropout_param {
+    dropout_ratio: 0.5
+  }
+}
+
+# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------- Homomorphism
+# -----------------------------------------------------------------------------
+# Train phase
+layer {
+  name: "homo_layer"
+  type: "HomoMeanLoss"
+  bottom: "fc7"
+  bottom: "label"
+  top: "homo_output"
+  top: "cluster_variance"
+  top: "scatter_variance"
+  propagate_down: true
+  propagate_down: false
+  homo_mean_loss_param {
+    cluster_measure: "rawsubsqr-overall-average"
+    scatter_measure: "rawsubsqr-samples-average"
+    cluster_regular: "rawsubsqr-overall-cluster"
+    scatter_regular: "rawsubsqr-samples-cluster"
+    cluster_clipmode: "blobal-diff-based"
+    scatter_clipmode: "blobal-diff-based"
+    cluster_lowrprop: 0.0
+    cluster_upprprop: 1.0
+    cluster_feedrate: 1.0
+    cluster_feedsize: 5000
+    cluster_tradeoff: 1.0
+    scatter_lowrprop: 0.0
+    scatter_upprprop: 1.0
+    scatter_feedrate: 1.0
+    scatter_feedsize: 5000
+    scatter_tradeoff: 1.0
+    cluster_interval: 2
+    cluster_postpone: 0
+    cluster_duration: 1
+    scatter_interval: 2
+    scatter_postpone: 1
+    scatter_duration: 1
+    average_initmode: false
+    label_axis: 1
+    label_nmax: 31
+    cluster_activate: true
+    scatter_activate: true
+  }
+  include: { phase: TRAIN }
+}
+
+# Test phase
+layer {
+  name: "homo_output"
+  type: "Split"
+  bottom: "fc7"
+  top: "homo_output"
+  include: { phase: TEST }
+}
+
+# ----------------------------------------------------------------------------
+layer {
+  name: "lp_fc8"
+  type: "InnerProduct"
+  bottom: "homo_output"
+  top: "lp_fc8"
+  param {
+    lr_mult: 10
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 20
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 31
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+
+layer {
+  name: "target_loss"
+  type: "SoftmaxWithLoss"
+  bottom: "lp_fc8"
+  bottom: "label"
+  top: "target_loss"
+  include: { phase: TEST }
+}
+
+layer {
+  name: "accuracy"
+  type: "Accuracy"
+  bottom: "lp_fc8"
+  bottom: "label"
+  top: "accuracy"
+  include: { phase: TEST }
+}
+
+layer {
+  name: "slice_lp_fc8"
+  type: "Slice"
+  bottom: "lp_fc8"
+  top: "source_lp_fc8"
+  top: "target_lp_fc8"
+  slice_param {
+    slice_dim: 0
+    slice_point: 256
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "slice_label"
+  type: "Slice"
+  bottom: "label"
+  top: "source_label"
+  top: "target_label"
+  slice_param {
+    slice_dim: 0
+    slice_point: 256
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "kill_target_label"
+  type: "Silence"
+  bottom: "target_label"
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "source_loss"
+  type: "SoftmaxWithLoss"
+  bottom: "source_lp_fc8"
+  bottom: "source_label"
+  top: "source_loss"
+  propagate_down: true
+  propagate_down: false
+  include: { phase: TRAIN }
+}
+
+# ----------------------------------------------------------------------------
+
+layer {
+  name: "target_prob"
+  type: "Softmax"
+  bottom: "target_lp_fc8"
+  top: "target_prob"
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "target_class"
+  type: "ArgMax"
+  bottom: "target_prob"
+  top: "target_class"
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "reshape"
+  type: "Reshape"
+  bottom: "target_class"
+  top: "reshaped_target_class"
+  reshape_param {
+    shape {
+      dim: 0  # copy the dimension from below
+    }
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "target_class"
+  type: "Bottom2Param"
+  bottom: "reshaped_target_class"
+  param {
+    name: "pseudo_label"
+  }
+  include: { phase: TRAIN }
+}

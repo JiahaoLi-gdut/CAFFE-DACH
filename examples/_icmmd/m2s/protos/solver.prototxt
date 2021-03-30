@@ -1,0 +1,17 @@
+net: "/home/ljh/caffe-master/examples/_icmmd/m2s/protos/train_val.prototxt"
+test_iter: 10
+test_interval: 20
+preforward_iter: 75
+preforward_interval: 1
+preforward_termination: true
+iter_size: 1
+base_lr: 0.01
+momentum: 0.9
+lr_policy: "inv"
+gamma: 0.001
+power: 0.75
+display: 1
+max_iter: 50000
+snapshot: 1000
+snapshot_prefix: "/home/ljh/caffe-master/examples/_icmmd/m2s/snapshots/train"
+solver_mode: GPU

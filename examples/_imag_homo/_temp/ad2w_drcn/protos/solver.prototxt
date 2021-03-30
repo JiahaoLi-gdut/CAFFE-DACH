@@ -1,0 +1,14 @@
+net: "/home/ljh/caffe-master/examples/_imag_homo/ad2w_drcn/protos/train_val.prototxt"
+test_iter: 15
+test_interval: 10
+iter_size: 15
+base_lr: 0.001
+momentum: 0.9
+lr_policy: "inv"
+gamma: 0.001
+power: 0.75
+display: 1
+max_iter: 2000
+snapshot: 1000
+snapshot_prefix: "/home/ljh/caffe-master/examples/_imag_homo/ad2w_drcn/snapshots/train"
+solver_mode: GPU

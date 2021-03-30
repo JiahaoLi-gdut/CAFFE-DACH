@@ -1,0 +1,17 @@
+net: "/home/ljh/caffe-master/examples/_mpd_homo/a2w/protos/train_val.prototxt"
+test_iter: 795
+test_interval: 10
+preforward_iter: 44
+preforward_interval: 1
+preforward_termination: true
+iter_size: 44
+base_lr: 0.001
+momentum: 0.9
+lr_policy: "inv"
+gamma: 0.001
+power: 0.75
+display: 1
+max_iter: 50000
+snapshot: 10000
+snapshot_prefix: "/home/ljh/caffe-master/examples/_mpd_homo/a2w/snapshots/train"
+solver_mode: GPU

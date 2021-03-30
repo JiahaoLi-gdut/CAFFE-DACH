@@ -1,0 +1,1767 @@
+name: "gan"
+
+# -----------------discriminator------------------
+# 1. Preforward D(G(z)) to caculate log(1-D(G(z))); // the preforwarding of discriminator iteration 
+# 2. Forward D(x) to caculate log(D(x));            // the forwarding of discriminator iteration 
+# 3. Backward gradient based two loss aboved;       // the backwarding of discriminator iteration 
+# 4. Update parameter of discriminator;
+# -------------------generator--------------------
+# 5. Forward D(G(z)) to caculate log(1-D(G(z)));
+# 6. Backward gradient based the loss aboved;
+# 7. Update parameter of generator;
+# ------------------------------------------------
+
+layer {
+  name: "images"
+  type: "ImageData"
+  top: "real_data"
+  top: "label"
+  transform_param {
+    mirror: true
+    mean_value: [127.5]
+    scale: 0.00784314
+  }
+  image_data_param {
+    source: "data/face_data.txt"
+    root_folder: "data/"
+    batch_size: 128
+    new_height: 64
+    new_width: 64
+    is_color: true
+    shuffle: true
+  }
+  preforward_down_init: 0
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "dat-forward-master"
+    target: "dat-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "dat-forward-master"
+    target: "dat-forward-slave"
+    command: "forward-off"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "silence"
+  type: "Silence"
+  bottom: "label"
+  preforward_down_init: 0
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "dat-forward-master"
+    target: "dat-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "dat-forward-master"
+    target: "dat-forward-slave"
+    command: "forward-off"
+  }
+  include { phase: TRAIN }
+}
+
+#----------- generator -----------
+
+layer {
+  name: "fake_data"
+  type: "RandomBlob"
+  bottom: "real_data"
+  top: "fake_data"
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_fc1"
+  type: "InnerProduct"
+  bottom: "fake_data"
+  top: "gen_fc1"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 1
+  }
+  inner_product_param {
+    num_output: 16384
+    weight_filler {
+      type: "gaussian"
+      std: 0.02
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_fc1_reshape"
+  type: "Reshape"
+  bottom: "gen_fc1"
+  top: "gen_fc1_reshape"
+  reshape_param {
+    shape {
+      dim: 0
+      dim: 1024
+      dim: 4
+      dim: 4
+    }
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_fc1_bn"
+  type: "BatchNorm"
+  bottom: "gen_fc1_reshape"
+  top: "gen_fc1_reshape"
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  batch_norm_param {
+    use_global_stats: false
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_fc1_scale"
+  type: "Scale"
+  bottom: "gen_fc1_reshape"
+  top: "gen_fc1_reshape"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  scale_param {
+    bias_term: true
+    gen_mode: true
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_fc1_relu"
+  type: "ReLU"
+  bottom: "gen_fc1_reshape"
+  top: "gen_fc1_reshape"
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_deconv2"
+  type: "Deconvolution"
+  bottom: "gen_fc1_reshape"
+  top: "gen_deconv2"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  convolution_param {
+    num_output: 512
+    pad: 2
+    kernel_size: 5
+    stride: 2
+    gen_mode: true
+    shape_offset: [1, 1]
+    weight_filler {
+      type: "gaussian"
+      std: 0.02
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_deconv2_bn"
+  type: "BatchNorm"
+  bottom: "gen_deconv2"
+  top: "gen_deconv2"
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  batch_norm_param {
+    use_global_stats: false
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_deconv2_scale"
+  type: "Scale"
+  bottom: "gen_deconv2"
+  top: "gen_deconv2"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  scale_param {
+    gen_mode: true
+    bias_term: true
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_deconv2_relu"
+  type: "ReLU"
+  bottom: "gen_deconv2"
+  top: "gen_deconv2"
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_deconv3"
+  type: "Deconvolution"
+  bottom: "gen_deconv2"
+  top: "gen_deconv3"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  convolution_param {
+    num_output: 256
+    pad: 2
+    kernel_size: 5
+    stride: 2
+    gen_mode: true
+    shape_offset: [1, 1]
+    weight_filler {
+      type: "gaussian"
+      std: 0.02
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_deconv3_bn"
+  type: "BatchNorm"
+  bottom: "gen_deconv3"
+  top: "gen_deconv3"
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  batch_norm_param {
+    use_global_stats: false
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_deconv3_scale"
+  type: "Scale"
+  bottom: "gen_deconv3"
+  top: "gen_deconv3"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  scale_param {
+    gen_mode: true
+    bias_term: true
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_deconv3_relu"
+  type: "ReLU"
+  bottom: "gen_deconv3"
+  top: "gen_deconv3"
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_deconv4"
+  type: "Deconvolution"
+  bottom: "gen_deconv3"
+  top: "gen_deconv4"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  convolution_param {
+    num_output: 128
+    pad: 2
+    kernel_size: 5
+    stride: 2
+    gen_mode: true
+    shape_offset: [1, 1]
+    weight_filler {
+      type: "gaussian"
+      std: 0.02
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_deconv4_bn"
+  type: "BatchNorm"
+  bottom: "gen_deconv4"
+  top: "gen_deconv4"
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  batch_norm_param {
+    use_global_stats: false
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_deconv4_scale"
+  type: "Scale"
+  bottom: "gen_deconv4"
+  top: "gen_deconv4"
+  param {
+    name: "gen_s4"
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    name: "gen_b4"
+    lr_mult: 1
+    decay_mult: 1
+  }
+  scale_param {
+    gen_mode: true
+    bias_term: true
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_deconv4_relu"
+  type: "ReLU"
+  bottom: "gen_deconv4"
+  top: "gen_deconv4"
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_deconv5"
+  type: "Deconvolution"
+  bottom: "gen_deconv4"
+  top: "gen_deconv5"
+  param {
+    name: "gen_w_5"
+    lr_mult: 1
+  }
+  param {
+    name: "gen_b_5"
+    lr_mult: 2
+  }
+  convolution_param {
+    num_output: 3
+    pad: 2
+    kernel_size: 5
+    stride: 2
+    gen_mode: true
+    shape_offset: [1, 1]
+    weight_filler {
+      type: "gaussian"
+      std: 0.02
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "gen_deconv5_tanh"
+  type: "TanH"
+  bottom: "gen_deconv5"
+  top: "gen_deconv5"
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+  }
+}
+
+layer {
+  name: "output_image"
+  type: "ImageStorage"
+  bottom: "gen_deconv5"
+  image_storage_param {
+    saveroot: "./caffe-master/examples/@HGAN/storage"
+  }
+  include { phase: TEST }
+}
+
+#-----------   gan gate  ------------
+
+layer {
+  name: "gan_gate"
+  type: "GANGate"
+  bottom: "real_data"
+  bottom: "gen_deconv5"
+  top: "dis_input"
+  gan_gate_param {
+    generator_interval: 3
+    generator_postpone: 2
+    generator_duration: 1
+    discriminator_interval: 3
+    discriminator_postpone: 0
+    discriminator_duration: 2
+  }
+  async_command_pusher {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "dat-forward-master"
+    target: "dat-forward-slave"
+    command: "forward-on"
+    interval: 3
+    postpone: 0
+    duration: 2
+    livetime: 2
+  }
+  async_command_pusher {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "dat-forward-master"
+    target: "dat-forward-slave"
+    command: "forward-off"
+    interval: 3
+    postpone: 0
+    duration: 2
+    livetime: 2
+  }
+  async_command_pusher {
+    pusher: "prev-preforward"
+    puller: "prev-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-off"
+    interval: 3
+    postpone: 0
+    duration: 2
+    livetime: 19
+  }
+  async_command_pusher {
+    pusher: "prev-preforward"
+    puller: "post-forward"
+    source: "gen-forward-master"
+    target: "gen-forward-slave"
+    command: "forward-on"
+    interval: 3
+    postpone: 0
+    duration: 2
+    livetime: 19
+  }
+  async_command_pusher {
+    pusher: "prev-preforward"
+    puller: "prev-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-off"
+    interval: 3
+    postpone: 0
+    duration: 2
+    livetime: 19
+  }
+  async_command_pusher {
+    pusher: "prev-preforward"
+    puller: "post-backward"
+    source: "gen-backward-master"
+    target: "gen-backward-slave"
+    command: "backward-opt"
+    interval: 3
+    postpone: 0
+    duration: 2
+    livetime: 19
+  }
+  async_command_pusher {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+    interval: 3
+    postpone: 2
+    duration: 1
+    livetime: 19
+  }
+  async_command_pusher {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+    interval: 3
+    postpone: 2
+    duration: 1
+    livetime: 19
+  }
+  include { phase: TRAIN }
+}
+
+#----------- discriminator -----------
+
+layer {
+  name: "dis_conv1"
+  type: "Convolution"
+  bottom: "dis_input"
+  top: "dis_conv1"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  convolution_param {
+    num_output: 128
+    pad: 2
+    kernel_size: 5
+    stride: 2
+    dis_mode: true
+    weight_filler {
+      type: "gaussian"
+      std: 0.02
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "dis_conv1_bn"
+  type: "BatchNorm"
+  bottom: "dis_conv1"
+  top: "dis_conv1"
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  batch_norm_param {
+    use_global_stats: false
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "dis_conv1_scale"
+  type: "Scale"
+  bottom: "dis_conv1"
+  top: "dis_conv1"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  scale_param {
+    dis_mode: true
+    bias_term: true
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "dis_conv1_relu"
+  type: "ReLU"
+  bottom: "dis_conv1"
+  top: "dis_conv1"
+  relu_param {
+    negative_slope: 0.2
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "dis_conv2"
+  type: "Convolution"
+  bottom: "dis_conv1"
+  top: "dis_conv2"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  convolution_param {
+    num_output: 256
+    pad: 2
+    kernel_size: 5
+    stride: 2
+    dis_mode: true
+    weight_filler {
+      type: "gaussian"
+      std: 0.02
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "dis_conv2_bn"
+  type: "BatchNorm"
+  bottom: "dis_conv2"
+  top: "dis_conv2"
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  batch_norm_param {
+    use_global_stats: false
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "dis_conv2_scale"
+  type: "Scale"
+  bottom: "dis_conv2"
+  top: "dis_conv2"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  scale_param {
+    dis_mode: true
+    bias_term: true
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "dis_conv2_relu"
+  type: "ReLU"
+  bottom: "dis_conv2"
+  top: "dis_conv2"
+  relu_param {
+    negative_slope: 0.2
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "dis_conv3"
+  type: "Convolution"
+  bottom: "dis_conv2"
+  top: "dis_conv3"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  convolution_param {
+    num_output: 512
+    pad: 2
+    kernel_size: 5
+    stride: 2
+    dis_mode: true
+    weight_filler {
+      type: "gaussian"
+      std: 0.02
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "dis_conv3_bn"
+  type: "BatchNorm"
+  bottom: "dis_conv3"
+  top: "dis_conv3"
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  batch_norm_param {
+    use_global_stats: false
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "dis_conv3_scale"
+  type: "Scale"
+  bottom: "dis_conv3"
+  top: "dis_conv3"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  scale_param {
+    dis_mode: true
+    bias_term: true
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "dis_conv3_relu"
+  type: "ReLU"
+  bottom: "dis_conv3"
+  top: "dis_conv3"
+  relu_param {
+    negative_slope: 0.2
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "dis_conv4"
+  type: "Convolution"
+  bottom: "dis_conv3"
+  top: "dis_conv4"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  convolution_param {
+    num_output: 1024
+    pad: 2
+    kernel_size: 5
+    stride: 2
+    dis_mode: true
+    weight_filler {
+      type: "gaussian"
+      std: 0.02
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "dis_conv4_bn"
+  type: "BatchNorm"
+  bottom: "dis_conv4"
+  top: "dis_conv4"
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  param {
+    lr_mult: 0
+    decay_mult: 0
+  }
+  batch_norm_param {
+    use_global_stats: false
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "dis_conv4_scale"
+  type: "Scale"
+  bottom: "dis_conv4"
+  top: "dis_conv4"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  scale_param {
+    dis_mode: true
+    bias_term: true
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "dis_conv4_relu"
+  type: "ReLU"
+  bottom: "dis_conv4"
+  top: "dis_conv4"
+  relu_param {
+    negative_slope: 0.2
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "dis_conv4_score"
+  type: "InnerProduct"
+  bottom: "dis_conv4"
+  top: "score"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  inner_product_param{
+    num_output: 1
+    dis_mode: true
+    weight_filler {
+      type: "gaussian"
+      std: 0.0002
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "sigmoid"
+  type: "Sigmoid"
+  bottom: "score"
+  top: "score"
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}
+
+layer {
+  name: "gan_loss"
+  type: "VanillaGANLoss"
+  bottom: "score"
+  top: "gan_loss"
+  vanilla_gan_loss_param {
+    generator_interval: 3
+    generator_postpone: 2
+    generator_duration: 1
+    discriminator_interval: 3
+    discriminator_postpone: 0
+    discriminator_duration: 2
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "prev-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-off"
+  }
+  async_command_puller {
+    pusher: "prev-forward"
+    puller: "post-backward"
+    source: "dis-param-master"
+    target: "dis-param-slave"
+    command: "param-backward-opt"
+  }
+  include { phase: TRAIN }
+}

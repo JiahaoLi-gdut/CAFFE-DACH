@@ -1,0 +1,14 @@
+net: "/home/ljh/caffe-master/examples/_gene_homo/sources_8000_target_4000_drcn_logscale_grid/protos/train_val.prototxt"
+test_iter: 1
+test_interval: 10
+iter_size: 1
+base_lr: 0.01
+momentum: 0.9
+lr_policy: "inv"
+gamma: 0.01
+power: 0.75
+display: 1
+max_iter: 10000
+snapshot: 5000
+snapshot_prefix: "/home/ljh/caffe-master/examples/_gene_homo/sources_8000_target_4000_drcn_logscale_grid/snapshots"
+solver_mode: GPU

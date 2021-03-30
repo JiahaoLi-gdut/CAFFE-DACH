@@ -1,0 +1,165 @@
+name: "Net for Gene"
+
+# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------- Data layer
+# -----------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------- Source
+# Train phase
+layer {
+  name: "source_data"
+  type: "Data"
+  top: "data"
+  top: "label"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_gene_homo/_datasets/gene_train_lmdb"
+    backend: LMDB
+    batch_size: 4000
+  }
+  include: { phase: TRAIN }
+}
+
+# Test phase
+layer {
+  name: "target_data"
+  type: "Data"
+  top: "data"
+  top: "label"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_gene_homo/_datasets/gene_test_lmdb"
+    backend: LMDB
+    batch_size: 2000
+  }
+  include: { phase: TEST }
+}
+# data shape: N 1 1 13876
+
+layer {
+  name: "logscaler"
+  type: "LogScaler"
+  bottom: "data"
+  top: "data"
+}
+
+# ---------------------------------------------------------------------- layer 1
+layer {
+  name: "grid1"
+  type: "Gridding"
+  bottom: "data"
+  top: "grid1"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  gridding_param {
+    gridding: "incomplete_gridding"
+    kernel_w: 2
+    stride_w: 1
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_term: false
+  }
+}
+
+layer {
+  name: "tanh"
+  type: "TanH"
+  bottom: "grid1"
+  top: "grid1"
+}
+
+layer {
+  name: "degrid1"
+  type: "Degridding"
+  bottom: "grid1"
+  top: "degrid1"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  degridding_param {
+    degridding: "incomplete_degridding"
+    kernel_w: 2
+    stride_w: 1
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_term: false
+  }
+}
+
+# ----------------------------------------------------------------------------
+layer {
+  name: "lp_fc"
+  type: "InnerProduct"
+  bottom: "grid1"
+  top: "lp_fc"
+  param {
+    lr_mult: 10
+    decay_mult: 1
+  }
+  inner_product_param {
+    num_output: 2
+    bias_term: false
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+  }
+}
+
+# ---------------------------------------------------------------------- classifier
+layer {
+  name: "classifier_accuracy"
+  type: "Accuracy"
+  bottom: "lp_fc"
+  bottom: "label"
+  top: "classifier_accuracy"
+  include: { phase: TEST }
+}
+
+layer {
+  name: "classifier_precision_recall"
+  type: "PrecisionRecall"
+  bottom: "lp_fc"
+  bottom: "label"
+  top: "classifier_precision"
+  top: "classifier_recall"
+  include: { phase: TEST }
+}
+
+layer {
+  name: "classifier_softmax"
+  type: "Softmax"
+  bottom: "lp_fc"
+  top: "classifier_softmax"
+  include: { phase: TEST }
+}
+
+layer {
+  name: "classifier_auc"
+  type: "AUC"
+  bottom: "classifier_softmax"
+  bottom: "label"
+  top: "classifier_auc"
+  include: { phase: TEST }
+}
+
+layer {
+  name: "classifier_loss"
+  type: "SoftmaxWithLoss"
+  bottom: "lp_fc"
+  bottom: "label"
+  top: "loss"
+}
+
+layer {
+  name: "eculidean_loss"
+  type: "EuclideanLoss"
+  bottom: "degrid1"
+  bottom: "data"
+  top: "euc_loss"
+}

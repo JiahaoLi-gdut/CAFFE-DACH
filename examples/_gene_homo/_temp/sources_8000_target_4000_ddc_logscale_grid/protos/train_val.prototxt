@@ -1,0 +1,188 @@
+name: "Net for Gen:e"
+
+# -----------------------------------------------------------------------------
+# ----------------------------------------------------------------- Data layer
+# -----------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------- Source
+# Train phase
+layer {
+  name: "source_data"
+  type: "Data"
+  top: "data"
+  top: "label"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_gene_homo/_datasets/gene_train_lmdb"
+    backend: LMDB
+    batch_size: 400
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "source_domain"
+  type: "Data"
+  top: "data_unused"
+  top: "domain"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_gene_homo/_datasets/gene_train_domain_lmdb"
+    backend: LMDB
+    batch_size: 400
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "kill_data_unused"
+  type: "Silence"
+  bottom: "data_unused"
+  include: { phase: TRAIN }
+}
+
+# Test phase
+layer {
+  name: "target_data"
+  type: "Data"
+  top: "data"
+  top: "label"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_gene_homo/_datasets/gene_test_lmdb"
+    backend: LMDB
+    batch_size: 4000
+  }
+  include: { phase: TEST }
+}
+# data shape: N 1 1 13876
+
+layer {
+  name: "logscaler"
+  type: "LogScaler"
+  bottom: "data"
+  top: "data"
+}
+
+# ---------------------------------------------------------------------- layer 1
+layer {
+  name: "grid1"
+  type: "Gridding"
+  bottom: "data"
+  top: "grid1"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  gridding_param {
+    gridding: "incomplete_gridding"
+    kernel_w: 2
+    stride_w: 1
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_term: false
+  }
+}
+
+layer {
+  name: "tanh"
+  type: "TanH"
+  bottom: "grid1"
+  top: "grid1"
+}
+
+layer {
+  name: "mmd_loss_1"
+  type: "MMDLoss"
+  bottom: "grid1"
+  bottom: "grid1"
+  bottom: "domain"
+  bottom: "domain"
+  top: "mmd_loss_1"
+  mmd_loss_param {
+    kernel_numb: 1
+    kernel_mult: 2.0
+    loss_weight: 1
+  }
+  include: { phase: TRAIN }
+}
+
+# ----------------------------------------------------------------------------
+layer {
+  name: "lp_fc"
+  type: "InnerProduct"
+  bottom: "grid1"
+  top: "lp_fc"
+  param {
+    lr_mult: 10
+    decay_mult: 1
+  }
+  inner_product_param {
+    num_output: 2
+    bias_term: false
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+  }
+}
+
+#layer {
+#  name: "mmd_loss_2"
+#  type: "MMDLoss"
+#  bottom: "lp_fc"
+#  bottom: "lp_fc"
+#  bottom: "domain"
+#  bottom: "domain"
+#  top: "mmd_loss_2"
+#  mmd_loss_param {
+#    kernel_numb: 1
+#    kernel_mult: 2.0
+#    loss_weight: 0.0
+#  }
+#  include: { phase: TRAIN }
+#}
+
+# ---------------------------------------------------------------------- classifier
+layer {
+  name: "classifier_accuracy"
+  type: "Accuracy"
+  bottom: "lp_fc"
+  bottom: "label"
+  top: "classifier_accuracy"
+  include: { phase: TEST }
+}
+
+layer {
+  name: "classifier_precision_recall"
+  type: "PrecisionRecall"
+  bottom: "lp_fc"
+  bottom: "label"
+  top: "classifier_precision"
+  top: "classifier_recall"
+  include: { phase: TEST }
+}
+
+layer {
+  name: "classifier_softmax"
+  type: "Softmax"
+  bottom: "lp_fc"
+  top: "classifier_softmax"
+  include: { phase: TEST }
+}
+
+layer {
+  name: "classifier_auc"
+  type: "AUC"
+  bottom: "classifier_softmax"
+  bottom: "label"
+  top: "classifier_auc"
+  include: { phase: TEST }
+}
+
+layer {
+  name: "classifier_loss"
+  type: "SoftmaxWithLoss"
+  bottom: "lp_fc"
+  bottom: "label"
+  top: "loss"
+}

@@ -1,0 +1,17 @@
+net: "/home/ljh/caffe-master/examples/_mpd_homo/s2m/protos/train_val.prototxt"
+test_iter: 600
+test_interval: 10
+preforward_iter: 600
+preforward_interval: 10
+preforward_termination: true
+iter_size: 1
+base_lr: 0.001
+momentum: 0.9
+momentum2: 0.999
+lr_policy: "fixed"
+display: 1
+max_iter: 10000
+snapshot: 2000
+snapshot_prefix: "/home/ljh/caffe-master/examples/_mpd_homo/s2m/snapshots/train"
+type: "Adam"
+solver_mode: GPU

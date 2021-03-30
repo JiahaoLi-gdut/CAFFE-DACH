@@ -1,0 +1,106 @@
+name: "Net for Gene"
+layer {
+  name: "data"
+  type: "Input"
+  top: "data"
+  input_param { shape: { dim: 1 dim: 1 dim: 1 dim: 13876 } }
+}
+layer {
+  name: "logscaler"
+  type: "LogScaler"
+  bottom: "data"
+  top: "data"
+}
+layer {
+  name: "grid1"
+  type: "Gridding"
+  bottom: "data"
+  top: "grid1"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  gridding_param {
+    gridding: "incomplete_gridding"
+    kernel_w: 2
+    stride_w: 1
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "tanh"
+  type: "TanH"
+  bottom: "grid1"
+  top: "grid1"
+}
+layer {
+  name: "grl"
+  type: "GradientScaler"
+  bottom: "grid1"
+  top: "grl"
+  gradient_scaler_param {
+    lower_bound: 0.0
+    upper_bound: 1.0
+    alpha: 10.0
+    max_iter: 5000
+  }
+}
+layer {
+  name: "lp_fc"
+  type: "InnerProduct"
+  bottom: "grid1"
+  top: "lp_fc"
+  param {
+    lr_mult: 10
+    decay_mult: 1
+  }
+  inner_product_param {
+    num_output: 2
+    bias_term: false
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+  }
+}
+layer {
+  name: "dc_ip"
+  type: "InnerProduct"
+  bottom: "grl"
+  top: "dc_ip"
+  param {
+    lr_mult: 10
+    decay_mult: 1
+  }
+  inner_product_param {
+    num_output: 2
+    bias_term: false
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+  }
+}
+
+layer {
+  name: "kill_dc_ip"
+  type: "Silence"
+  bottom: "dc_ip"
+}
+layer {
+  name: "prob"
+  type: "Softmax"
+  bottom: "lp_fc"
+  top: "prob"
+}

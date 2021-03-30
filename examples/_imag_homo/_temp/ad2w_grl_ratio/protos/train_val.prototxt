@@ -1,0 +1,593 @@
+name: "AlexNet for Office"
+
+# ---------------------------------------------------------------------- Source
+# Train phase
+layer {
+  name: "source_train"
+  type: "Data"
+  top: "data"
+  top: "label"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_imag_homo/_datasets/image_train_lmdb"
+    backend: LMDB
+    batch_size: 400
+  }
+  transform_param {
+    crop_size: 227
+    mean_file: "/home/ljh/caffe-master/data/ilsvrc12/imagenet_mean.binaryproto"
+    mirror: true
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "source_train_domain"
+  type: "Data"
+  top: "unused"
+  top: "domain"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_imag_homo/_datasets/image_train_domain_lmdb"
+    backend: LMDB
+    batch_size: 400
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "kill_unused"
+  type: "Silence"
+  bottom: "unused"
+  include: { phase: TRAIN }
+}
+
+# ---------------------------------------------------------------------- Target
+# Test phase
+layer {
+  name: "target_test"
+  type: "Data"
+  top: "data"
+  top: "label"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_imag_homo/_datasets/image_test_lmdb"
+    backend: LMDB
+    batch_size: 200
+  }
+  transform_param {
+    crop_size: 227
+    mean_file: "/home/ljh/caffe-master/data/ilsvrc12/imagenet_mean.binaryproto"
+    mirror: true
+  }
+  include: { phase: TEST }
+}
+
+# ----------------------------------------------------------------------------
+layer {
+  name: "conv1"
+  type: "Convolution"
+  bottom: "data"
+  top: "conv1"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 96
+    kernel_size: 11
+    stride: 4
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "relu1"
+  type: "ReLU"
+  bottom: "conv1"
+  top: "conv1"
+}
+layer {
+  name: "norm1"
+  type: "LRN"
+  bottom: "conv1"
+  top: "norm1"
+  lrn_param {
+    local_size: 5
+    alpha: 0.0001
+    beta: 0.75
+  }
+}
+layer {
+  name: "pool1"
+  type: "Pooling"
+  bottom: "norm1"
+  top: "pool1"
+  pooling_param {
+    pool: MAX
+    kernel_c: 1
+    kernel_h: 3
+    kernel_w: 3
+    stride_c: 1
+    stride_h: 2
+    stride_w: 2
+  }
+}
+# ----------------------------------------------------------------------------
+layer {
+  name: "conv2"
+  type: "Convolution"
+  bottom: "pool1"
+  top: "conv2"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 256
+    pad: 2
+    kernel_size: 5
+    group: 2
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.1
+    }
+  }
+}
+layer {
+  name: "relu2"
+  type: "ReLU"
+  bottom: "conv2"
+  top: "conv2"
+}
+layer {
+  name: "norm2"
+  type: "LRN"
+  bottom: "conv2"
+  top: "norm2"
+  lrn_param {
+    local_size: 5
+    alpha: 0.0001
+    beta: 0.75
+  }
+}
+layer {
+  name: "pool2"
+  type: "Pooling"
+  bottom: "norm2"
+  top: "pool2"
+  pooling_param {
+    pool: MAX
+    kernel_c: 1
+    kernel_h: 3
+    kernel_w: 3
+    stride_c: 1
+    stride_h: 2
+    stride_w: 2
+  }
+}
+# ----------------------------------------------------------------------------
+layer {
+  name: "conv3"
+  type: "Convolution"
+  bottom: "pool2"
+  top: "conv3"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 384
+    pad: 1
+    kernel_size: 3
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "relu3"
+  type: "ReLU"
+  bottom: "conv3"
+  top: "conv3"
+}
+# ----------------------------------------------------------------------------
+layer {
+  name: "conv4"
+  type: "Convolution"
+  bottom: "conv3"
+  top: "conv4"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 384
+    pad: 1
+    kernel_size: 3
+    group: 2
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.1
+    }
+  }
+}
+layer {
+  name: "relu4"
+  type: "ReLU"
+  bottom: "conv4"
+  top: "conv4"
+}
+# ----------------------------------------------------------------------------
+layer {
+  name: "conv5"
+  type: "Convolution"
+  bottom: "conv4"
+  top: "conv5"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 256
+    pad: 1
+    kernel_size: 3
+    group: 2
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.1
+    }
+  }
+}
+layer {
+  name: "relu5"
+  type: "ReLU"
+  bottom: "conv5"
+  top: "conv5"
+}
+layer {
+  name: "pool5"
+  type: "Pooling"
+  bottom: "conv5"
+  top: "pool5"
+  pooling_param {
+    pool: MAX
+    kernel_c: 1
+    kernel_h: 3
+    kernel_w: 3
+    stride_c: 1
+    stride_h: 2
+    stride_w: 2
+  }
+}
+# ----------------------------------------------------------------------------
+layer {
+  name: "fc6"
+  type: "InnerProduct"
+  bottom: "pool5"
+  top: "fc6"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 4096
+    weight_filler {
+      type: "gaussian"
+      std: 0.005
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.1
+    }
+  }
+}
+layer {
+  name: "relu6"
+  type: "ReLU"
+  bottom: "fc6"
+  top: "fc6"
+}
+layer {
+  name: "drop6"
+  type: "Dropout"
+  bottom: "fc6"
+  top: "fc6"
+  dropout_param {
+    dropout_ratio: 0.5
+  }
+}
+# ----------------------------------------------------------------------------
+layer {
+  name: "fc7"
+  type: "InnerProduct"
+  bottom: "fc6"
+  top: "fc7"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 4096
+    weight_filler {
+      type: "gaussian"
+      std: 0.005
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.1
+    }
+  }
+}
+layer {
+  name: "relu7"
+  type: "ReLU"
+  bottom: "fc7"
+  top: "fc7"
+}
+layer {
+  name: "drop7"
+  type: "Dropout"
+  bottom: "fc7"
+  top: "fc7"
+  dropout_param {
+    dropout_ratio: 0.5
+  }
+}
+# ----------------------------------------------------------------------------
+layer {
+  name: "bottleneck"
+  type: "InnerProduct"
+  bottom: "fc7"
+  top: "bottleneck"
+  param {
+    lr_mult: 10
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 20
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 256
+    weight_filler {
+      type: "gaussian"
+      std: 0.005
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.1
+    }
+  }
+}
+
+# -----------------------------------------------------------------------------
+# ----------------------------------------------------------- Gradient reversal
+# -----------------------------------------------------------------------------
+
+layer {
+  name: "align"
+  type: "GradientAlignment"
+  bottom: "bottleneck"
+  top: "align1"
+  top: "align2"
+  gradient_alignment_param {
+    lambda: -1
+  }
+}
+
+layer {
+  name: "kill_align2"
+  type: "Silence"
+  bottom: "align2"
+  include: { phase: TEST }
+}
+
+layer {
+  name: "lp_fc8"
+  type: "InnerProduct"
+  bottom: "align1"
+  top: "lp_fc8"
+  param {
+    lr_mult: 10
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 20
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 31
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+layer {
+  name: "lp_accuracy"
+  type: "Accuracy"
+  bottom: "lp_fc8"
+  bottom: "label"
+  top: "lp_accuracy"
+  include: { phase: TEST }
+}
+layer {
+  name: "lp_loss"
+  type: "SoftmaxWithLoss"
+  bottom: "lp_fc8"
+  bottom: "label"
+  top: "lp_loss"
+}
+
+
+# -----------------------------------------------------------------------------
+# ----------------------------------------------------------- Domain classifier
+# -----------------------------------------------------------------------------
+layer {
+  name: "dc_ip1"
+  type: "InnerProduct"
+  bottom: "align2"
+  top: "dc_ip1"
+  param {
+    lr_mult: 10
+  }
+  param {
+    lr_mult: 20
+  }
+  inner_product_param {
+    num_output: 1024
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+  include: { phase: TRAIN }
+}
+layer {
+  name: "dc_relu1"
+  type: "ReLU"
+  bottom: "dc_ip1"
+  top: "dc_ip1"
+  include: { phase: TRAIN }
+}
+layer {
+  name: "dc_drop1"
+  type: "Dropout"
+  bottom: "dc_ip1"
+  top: "dc_ip1"
+  dropout_param {
+    dropout_ratio: 0.5
+  }
+  include: { phase: TRAIN }
+}
+# ----------------------------------------------------------------------------
+layer {
+  name: "dc_ip2"
+  type: "InnerProduct"
+  bottom: "dc_ip1"
+  top: "dc_ip2"
+  param {
+    lr_mult: 10
+  }
+  param {
+    lr_mult: 20
+  }
+  inner_product_param {
+    num_output: 1024
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+  include: { phase: TRAIN }
+}
+layer {
+  name: "dc_relu2"
+  type: "ReLU"
+  bottom: "dc_ip2"
+  top: "dc_ip2"
+  include: { phase: TRAIN }
+}
+layer {
+  name: "dc_drop2"
+  type: "Dropout"
+  bottom: "dc_ip2"
+  top: "dc_ip2"
+  dropout_param {
+    dropout_ratio: 0.5
+  }
+  include: { phase: TRAIN }
+}
+# ----------------------------------------------------------------------------
+layer {
+  name: "dc_ip3"
+  type: "InnerProduct"
+  bottom: "dc_ip2"
+  top: "dc_ip3"
+  param {
+    lr_mult: 10
+  }
+  param {
+    lr_mult: 20
+  }
+  inner_product_param {
+    num_output: 1
+    weight_filler {
+      type: "gaussian"
+      std: 0.3
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "dc_loss"
+  type: "SigmoidCrossEntropyLoss"
+  bottom: "dc_ip3"
+  bottom: "domain"
+  top: "dc_loss"
+  loss_weight: 0.1
+  include: { phase: TRAIN }
+}

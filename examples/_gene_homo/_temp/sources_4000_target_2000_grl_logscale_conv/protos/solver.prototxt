@@ -1,0 +1,14 @@
+net: "/home/ljh/caffe-master/examples/_gene_homo/sources_4000_target_2000_grl_logscale_conv/protos/train_val.prototxt"
+test_iter: 1
+test_interval: 10
+iter_size: 1
+base_lr: 0.01
+momentum: 0.9
+lr_policy: "inv"
+gamma: 0.01
+power: 0.75
+display: 1
+max_iter: 1000
+snapshot: 1000
+snapshot_prefix: "/home/ljh/caffe-master/examples/_gene_homo/sources_4000_target_2000_grl_logscale_conv/snapshots/train"
+solver_mode: GPU

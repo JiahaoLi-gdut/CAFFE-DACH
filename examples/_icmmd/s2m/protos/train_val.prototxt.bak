@@ -1,0 +1,465 @@
+name: "AlexNet for Office"
+
+# -----------------------------------------------------------------------------------
+# Train phase
+
+layer {
+  name: "major_source"
+  type: "Data"
+  top: "major_source_datum"
+  top: "label"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_icmmd/_datasets/svhn_train_lmdb"
+    backend: LMDB
+    batch_size: 800
+  }
+  include: { phase: TRAIN }
+}
+
+# -----------------------------------------------------------------------------------
+
+layer {
+  name: "latch_source"
+  type: "Data"
+  top: "latch_source_datum"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_icmmd/_datasets/svhn_train_lmdb"
+    backend: LMDB
+    batch_size: 800
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "latch_source_label"
+  type: "Param2Top"
+  top: "latch_source_label"
+  param {
+    name: "latch_source_pseudo"
+  }
+  param2top_param {
+    data_filler {
+      type: "constant"
+      value: -1
+    }
+    data_refill: 1
+    shape {
+      dim: 800
+    }
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "icmmd_source"
+  type: "ClassLatch"
+  bottom: "latch_source_datum"
+  bottom: "latch_source_label"
+  top: "icmmd_source_datum"
+  class_latch_param {
+    label_nmax: 10
+    latch_nmin: 200
+  }
+  include: { phase: TRAIN }
+}
+
+# -----------------------------------------------------------------------------------
+
+layer {
+  name: "latch_target"
+  type: "Data"
+  top: "latch_target_datum"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_icmmd/_datasets/mnist_train_lmdb"
+    backend: LMDB
+    batch_size: 800
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "latch_target_label"
+  type: "Param2Top"
+  top: "latch_target_label"
+  param {
+    name: "latch_target_pseudo"
+  }
+  param2top_param {
+    data_filler {
+      type: "constant"
+      value: -1
+    }
+    data_refill: 1
+    shape {
+      dim: 800
+    }
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "icmmd_target"
+  type: "ClassLatch"
+  bottom: "latch_target_datum"
+  bottom: "latch_target_label"
+  top: "icmmd_target_datum"
+  class_latch_param {
+    label_nmax: 10
+    latch_nmin: 200
+  }
+  include: { phase: TRAIN }
+}
+
+# -----------------------------------------------------------------------------------
+
+layer {
+  name: "train_data"
+  type: "Concat"
+  bottom: "major_source_datum"
+  bottom: "icmmd_source_datum"
+  bottom: "icmmd_target_datum"
+  top: "data"
+  concat_param {
+    concat_dim: 0
+  }
+  include: { phase: TRAIN }
+}
+
+# -----------------------------------------------------------------------------------
+# Test phase
+
+layer {
+  name: "target_test"
+  type: "Data"
+  top: "data"
+  top: "label"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_icmmd/_datasets/mnist_test_lmdb"
+    backend: LMDB
+    batch_size: 2000
+  }
+  include: { phase: TEST }
+}
+
+# ----------------------------------------------------------------------------
+
+layer {
+  name: "conv1"
+  type: "Convolution"
+  bottom: "data"
+  top: "conv1"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 20
+    kernel_size: 5
+    stride: 1
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+
+layer {
+  name: "relu1"
+  type: "ReLU"
+  bottom: "conv1"
+  top: "conv1"
+}
+
+layer {
+  name: "pool1"
+  type: "Pooling"
+  bottom: "conv1"
+  top: "pool1"
+  pooling_param {
+    pool: MAX
+    kernel_c: 1
+    kernel_h: 2
+    kernel_w: 2
+    stride_c: 1
+    stride_h: 2
+    stride_w: 2
+  }
+}
+
+# ----------------------------------------------------------------------------
+
+layer {
+  name: "conv2"
+  type: "Convolution"
+  bottom: "pool1"
+  top: "conv2"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  convolution_param {
+    num_output: 50
+    kernel_size: 5
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.1
+    }
+  }
+}
+
+layer {
+  name: "relu2"
+  type: "ReLU"
+  bottom: "conv2"
+  top: "conv2"
+}
+
+layer {
+  name: "pool2"
+  type: "Pooling"
+  bottom: "conv2"
+  top: "pool2"
+  pooling_param {
+    pool: MAX
+    kernel_c: 1
+    kernel_h: 2
+    kernel_w: 2
+    stride_c: 1
+    stride_h: 2
+    stride_w: 2
+  }
+}
+
+layer {
+  name: "fc3"
+  type: "InnerProduct"
+  bottom: "pool2"
+  top: "fc3"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 200
+    weight_filler {
+      type: "gaussian"
+      std: 0.005
+    }
+    bias_filler {
+      type: "constant"
+      value: 0.1
+    }
+  }
+}
+
+layer {
+  name: "relu3"
+  type: "ReLU"
+  bottom: "fc3"
+  top: "fc3"
+}
+
+# ----------------------------------------------------------------------------
+
+layer {
+  name: "fc4"
+  type: "InnerProduct"
+  bottom: "fc3"
+  top: "fc4"
+  param {
+    lr_mult: 10
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 20
+    decay_mult: 0
+  }
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "gaussian"
+      std: 0.01
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+
+# ----------------------------------------------------------------------------
+
+layer {
+  name: "slice_fc3_features"
+  type: "Slice"
+  bottom: "fc3"
+  top: "major_fc3_features"
+  top: "icmmd_fc3_features"
+  slice_param {
+    slice_dim: 0
+    slice_point: 800
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "kill_major_fc3_features"
+  type: "Silence"
+  bottom: "major_fc3_features"
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "slice_fc4_features"
+  type: "Slice"
+  bottom: "fc4"
+  top: "major_fc4_features"
+  top: "icmmd_fc4_features"
+  slice_param {
+    slice_dim: 0
+    slice_point: 800
+  }
+  include: { phase: TRAIN }
+}
+
+# -----------------------------------------------------------------------------
+
+layer {
+  name: "train_loss"
+  type: "SoftmaxWithLoss"
+  bottom: "major_fc4_features"
+  bottom: "label"
+  top: "train_loss"
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "test_loss"
+  type: "SoftmaxWithLoss"
+  bottom: "fc4"
+  bottom: "label"
+  top: "test_loss"
+  include: { phase: TEST }
+}
+
+layer {
+  name: "accuracy"
+  type: "Accuracy"
+  bottom: "fc4"
+  bottom: "label"
+  top: "accuracy"
+  include: { phase: TEST }
+}
+
+# -----------------------------------------------------------------------------
+
+layer {
+  name: "slice_icmmd_fc3_features"
+  type: "Slice"
+  bottom: "icmmd_fc3_features"
+  top: "icmmd_source_fc3_features"
+  top: "icmmd_target_fc3_features"
+  slice_param {
+    slice_dim: 0
+    slice_point: 800
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "mmdx_loss"
+  type: "MMDXLoss"
+  bottom: "icmmd_source_fc3_features"
+  bottom: "icmmd_target_fc3_features"
+  top: "mmd_loss"
+  mmdx_loss_param {
+    kernel_numb: 5
+    kernel_mult: 2.0
+    loss_weight: 0.1
+  }
+  include: { phase: TRAIN }
+}
+
+# -----------------------------------------------------------------------------
+
+layer {
+  name: "icmmd_fc4_prob"
+  type: "Softmax"
+  bottom: "icmmd_fc4_features"
+  top: "icmmd_fc4_prob"
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "icmmd_fc4_class"
+  type: "ArgMax"
+  bottom: "icmmd_fc4_prob"
+  top: "icmmd_fc4_class"
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "reshaped_fc4_class"
+  type: "Reshape"
+  bottom: "icmmd_fc4_class"
+  top: "reshaped_icmmd_fc4_class"
+  reshape_param {
+    shape {
+      dim: 0  # copy the dimension from below
+    }
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "slice_reshaped_icmmd_fc4_class"
+  type: "Slice"
+  bottom: "reshaped_icmmd_fc4_class"
+  top: "icmmd_source_class"
+  top: "icmmd_target_class"
+  slice_param {
+    slice_dim: 0
+    slice_point: 800
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "latch_source_pseudo"
+  type: "Bottom2Param"
+  bottom: "icmmd_source_class"
+  param {
+    name: "latch_source_pseudo"
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "latch_target_pseudo"
+  type: "Bottom2Param"
+  bottom: "icmmd_target_class"
+  param {
+    name: "latch_target_pseudo"
+  }
+  include: { phase: TRAIN }
+}

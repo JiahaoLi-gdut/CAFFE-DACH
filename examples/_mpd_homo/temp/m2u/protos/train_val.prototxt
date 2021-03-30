@@ -1,0 +1,433 @@
+name: "Net"
+
+# ---------------------------------------------------------------------- Source
+# Train phase
+layer {
+  name: "source_train"
+  type: "Data"
+  top: "source_train_data"
+  top: "label"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_mpd_homo/_datasets/mnist_train_lmdb_28"
+    backend: LMDB
+    batch_size: 100
+  }
+  include: { phase: TRAIN }
+}
+
+# ---------------------------------------------------------------------- Target
+# Train phase
+layer {
+  name: "target_train"
+  type: "Data"
+  top: "target_train_data"
+  top: "target_train_label_unused"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_mpd_homo/_datasets/usps_train_lmdb"
+    backend: LMDB
+    batch_size: 100
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "kill_target_train_label_unused"
+  type: "Silence"
+  bottom: "target_train_label_unused"
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "target_train_label"
+  type: "DummyData"
+  top: "target_train_label_"
+  dummy_data_param {
+    data_filler {
+      type: "constant"
+      value: -1
+    }
+    num: 100
+    channels: 1
+    height: 1
+    width: 1
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "reshape"
+  type: "Reshape"
+  bottom: "target_train_label_"
+  top: "target_train_label"
+  reshape_param {
+    shape {
+      dim: 0  # copy the dimension from below
+    }
+  }
+  include: { phase: TRAIN }
+}
+
+# Test phase
+layer {
+  name: "target_test"
+  type: "Data"
+  top: "data"
+  top: "label"
+  data_param {
+    source: "/home/ljh/caffe-master/examples/_mpd_homo/_datasets/usps_train_lmdb"
+    backend: LMDB
+    batch_size: 100
+  }
+  include: { phase: TEST }
+}
+
+# ---------------------------------------------------------- Data concatenation
+# Train phase
+layer {
+  name: "concat_train_data"
+  type: "Concat"
+  bottom: "source_train_data"
+  bottom: "target_train_data"
+  top: "data"
+  concat_param {
+    concat_dim: 0
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "concat_train_label"
+  type: "Concat"
+  bottom: "label"
+  bottom: "target_train_label"
+  top: "train_label"
+  concat_param {
+    concat_dim: 0
+  }
+  include: { phase: TRAIN }
+}
+
+# ----------------------------------------------------------------------------
+
+layer {
+  name: "conv1"
+  type: "Convolution"
+  bottom: "data"
+  top: "conv1"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  convolution_param {
+    num_output: 100
+    kernel_size: 3
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+
+layer {
+  name: "relu1"
+  type: "ReLU"
+  bottom: "conv1"
+  top: "conv1"
+}
+
+layer {
+  name: "pool1"
+  type: "Pooling"
+  bottom: "conv1"
+  top: "pool1"
+  pooling_param {
+    pool: MAX
+    kernel_c: 1
+    kernel_h: 2
+    kernel_w: 2
+    stride_c: 1
+    stride_h: 1
+    stride_w: 1
+  }
+}
+
+layer {
+  name: "conv2"
+  type: "Convolution"
+  bottom: "pool1"
+  top: "conv2"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  convolution_param {
+    num_output: 150
+    kernel_size: 3
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+
+
+layer {
+  name: "relu2"
+  type: "ReLU"
+  bottom: "conv2"
+  top: "conv2"
+}
+
+layer {
+  name: "pool2"
+  type: "Pooling"
+  bottom: "conv2"
+  top: "pool2"
+  pooling_param {
+    pool: MAX
+    kernel_c: 1
+    kernel_h: 2
+    kernel_w: 2
+    stride_c: 1
+    stride_h: 1
+    stride_w: 1
+  }
+}
+
+layer {
+  name: "conv3"
+  type: "Convolution"
+  bottom: "pool2"
+  top: "conv3"
+  param {
+    lr_mult: 1
+  }
+  param {
+    lr_mult: 2
+  }
+  convolution_param {
+    num_output: 200
+    kernel_size: 3
+    stride: 1
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+    }
+  }
+}
+
+layer {
+  name: "relu3"
+  type: "ReLU"
+  bottom: "conv3"
+  top: "conv3"
+}
+
+layer {
+  name: "fc4"
+  type: "InnerProduct"
+  bottom: "conv3"
+  top: "fc4"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 1
+  }
+  inner_product_param {
+    num_output: 1024
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+
+layer {
+  name: "relu4"
+  type: "ReLU"
+  bottom: "fc4"
+  top: "fc4"
+}
+
+layer {
+  name: "drop4"
+  type: "Dropout"
+  bottom: "fc4"
+  top: "fc4"
+  dropout_param {
+    dropout_ratio: 0.5
+  }
+}
+
+layer {
+  name: "fc5"
+  type: "InnerProduct"
+  bottom: "fc4"
+  top: "fc5"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 1
+  }
+  inner_product_param {
+    num_output: 1024
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+
+layer {
+  name: "relu5"
+  type: "ReLU"
+  bottom: "fc5"
+  top: "fc5"
+}
+
+layer {
+  name: "drop5"
+  type: "Dropout"
+  bottom: "fc5"
+  top: "fc5"
+  dropout_param {
+    dropout_ratio: 0.5
+  }
+}
+
+# -----------------------------------------------------------------------------
+# ---------------------------------------------------------------- Homomorphism
+# -----------------------------------------------------------------------------
+# Train phase
+layer {
+  name: "homo_mean_loss"
+  type: "HomoMeanLoss"
+  bottom: "fc5"
+  bottom: "train_label"
+  top: "homo_output"
+  top: "ovalize_measure"
+  homo_mean_loss_param {
+    odotter_measure: "rawsubsqr-overall-average"
+    ovalize_measure: "rawsubsqr-sqroots-sqroots"
+    odotter_regular: "rawsubsqr-overall-average"
+    ovalize_regular: "expsubsqr-sqroots-sqroots"
+    ovalize_clipmode: "blobal-diff-based"
+    ovalize_lowrprop: 0.0
+    ovalize_upprprop: 1.0
+    ovalize_feedrate: 10.0
+    ovalize_feedsize: 10000
+    ovalize_tradeoff: 0.0
+    ovals2s_01stprop: 0.0
+    ovals2s_02ndprop: 0.0
+    ovalt2t_01stprop: 0.0
+    ovalt2t_02ndprop: 0.0
+    ovals2t_01stprop: 1.0
+    ovals2t_02ndprop: 1.0
+    ovalize_interval: 1
+    ovalize_postpone: 0
+    ovalize_duration: 1
+    average_initmode: true
+    match_numb: 100
+    label_axis: 1
+    label_nmax: 2
+    ovalize_activate: true
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "slice_features"
+  type: "Slice"
+  bottom: "homo_output"
+  top: "features"
+  top: "target_features"
+  slice_param {
+    slice_dim: 0
+    slice_point: 100
+  }
+  include: { phase: TRAIN }
+}
+
+layer {
+  name: "kill_target_features"
+  type: "Silence"
+  bottom: "target_features"
+  include: { phase: TRAIN }
+}
+
+# Test phase
+layer {
+  name: "ignore_homo_output"
+  type: "Split"
+  bottom: "fc5"
+  top: "features"
+  include: { phase: TEST }
+}
+
+#----------------------------------------------------------------------------
+
+layer {
+  name: "lp_fc6"
+  type: "InnerProduct"
+  bottom: "features"
+  top: "lp_fc6"
+  param {
+    lr_mult: 1
+    decay_mult: 1
+  }
+  param {
+    lr_mult: 2
+    decay_mult: 1
+  }
+  inner_product_param {
+    num_output: 10
+    weight_filler {
+      type: "xavier"
+    }
+    bias_filler {
+      type: "constant"
+      value: 0
+    }
+  }
+}
+
+layer {
+  name: "accuracy"
+  type: "Accuracy"
+  bottom: "lp_fc6"
+  bottom: "label"
+  top: "accuracy"
+  include: { phase: TEST }
+}
+
+layer {
+  name: "loss"
+  type: "SoftmaxWithLoss"
+  bottom: "lp_fc6"
+  bottom: "label"
+  top: "loss"
+}
